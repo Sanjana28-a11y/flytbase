@@ -227,6 +227,7 @@ function buildDashboardState() {
     const opportunities = Array.isArray(account.opportunities) ? account.opportunities : [];
     const offers = Array.isArray(account.offers) ? account.offers : [];
     const usageRecord = getPaperworkRecord(accountId, "usage_weekly.csv");
+    const dealHistoryRecord = getPaperworkRecord(accountId, "deal_history.json");
     const usage = analyzeWeeklyUsage(usageRecord?.text);
 
     for (const record of store.paperwork?.[accountId]?.records || []) {
@@ -284,6 +285,39 @@ function buildDashboardState() {
         category: "Value not recorded",
         reason: opportunity.blocker?.text || "Confirm qualification, value, and timing.",
         sources: opportunity.id ? [`${id}:${opportunity.id}`] : [],
+      });
+    }
+
+    if (opportunities.length === 0) {
+      const handoverItems = dealHistoryRecord?.data?.on_file_as_open_at_handover || [];
+      handoverItems.forEach((item, index) => {
+        const source = `${accountId}:deal_history.json`;
+        const itemTitle = item.what || "Handover item";
+        const sources = [source, `${accountId}:contract.txt`].filter(
+          (sourceKey) => sourceIndex[sourceKey]
+        );
+
+        if (item.value != null && Number.isFinite(Number(item.value))) {
+          backedItems.push({
+            id: `${accountId}_handover_${index}`,
+            title: `${itemTitle}${item.due ? ` (renewal due ${item.due})` : ""}`,
+            value: Number(item.value),
+            currency: "USD",
+            category: "Contract-backed renewal",
+            backingNote: item.basis || "Recorded in the account handover.",
+            sources,
+          });
+        } else {
+          unbackedItems.push({
+            id: `${accountId}_handover_${index}`,
+            title: itemTitle,
+            value: 0,
+            currency: "USD",
+            category: "Unvalued handover item",
+            reason: item.basis || "Value and supporting evidence need confirmation.",
+            sources,
+          });
+        }
       });
     }
 
